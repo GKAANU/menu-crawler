@@ -1,5 +1,6 @@
 import express from "express";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 
 const app = express();
 app.use(express.json());
@@ -11,8 +12,9 @@ app.post("/crawl", async (req, res) => {
   }
 
   const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: chromium.args,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
 
   const page = await browser.newPage();
@@ -43,7 +45,7 @@ app.post("/crawl", async (req, res) => {
       await new Promise(r => setTimeout(r, 2000));
       let newUrl = page.url();
 
-      // Fallback for SPA menus
+      // Fallback if SPA
       if (newUrl === prevUrl) {
         const html = await page.content();
         const match = html.match(/data-id="(\d+)"/);
@@ -67,6 +69,6 @@ app.post("/crawl", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () =>
+app.listen(PORT, "0.0.0.0", () =>
   console.log(`✅ Puppeteer crawler ready on port ${PORT}`)
 );
