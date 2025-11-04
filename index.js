@@ -1,3 +1,10 @@
+import express from "express";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
+
+const app = express();
+app.use(express.json({ limit: "2mb" }));
+
 app.post("/crawl", async (req, res) => {
   const { url, sections, menu_button } = req.body;
 
@@ -8,9 +15,16 @@ app.post("/crawl", async (req, res) => {
     return res.status(400).json({ error: "Sections must be a non-empty array" });
   }
 
+  let executablePath;
+  try {
+    executablePath = await chromium.executablePath();
+  } catch {
+    executablePath = "/usr/bin/chromium-browser";
+  }
+
   const browser = await puppeteer.launch({
     args: chromium.args.concat(["--disable-dev-shm-usage", "--no-sandbox"]),
-    executablePath: await chromium.executablePath(),
+    executablePath,
     headless: chromium.headless,
   });
 
@@ -33,7 +47,7 @@ app.post("/crawl", async (req, res) => {
     try {
       console.log(`🔹 Trying section: ${section}`);
 
-      // 🔸 1️⃣ Section tıklamayı dene
+      // 1️⃣ Section tıklamayı dene
       clicked = await page.evaluate((sectionName) => {
         const els = Array.from(
           document.querySelectorAll(
@@ -51,7 +65,7 @@ app.post("/crawl", async (req, res) => {
         return false;
       }, section);
 
-      // 🔸 2️⃣ Eğer tıklayamadıysa menu_button varsa onu tıkla ve tekrar dene
+      // 2️⃣ Section tıklanamadıysa menu_button varsa tıkla
       if (!clicked && menu_button && menu_button.text) {
         console.log(`⚙️ Couldn't click section, trying menu button "${menu_button.text}"...`);
         await page.evaluate((btnText) => {
@@ -63,7 +77,7 @@ app.post("/crawl", async (req, res) => {
         }, menu_button.text);
         await new Promise(r => setTimeout(r, 2500));
 
-        // menu_button’a bastıktan sonra section’ı tekrar dene
+        // tekrar dene
         clicked = await page.evaluate((sectionName) => {
           const els = Array.from(
             document.querySelectorAll(
@@ -87,7 +101,7 @@ app.post("/crawl", async (req, res) => {
         continue;
       }
 
-      // 🔸 3️⃣ URL değişimini takip et
+      // 3️⃣ URL değişimini takip et
       const prevUrl = page.url();
       await new Promise(r => setTimeout(r, 3000));
       newUrl = page.url();
@@ -105,7 +119,7 @@ app.post("/crawl", async (req, res) => {
       results.push({ name: section, url: newUrl });
       console.log(`✅ Found URL for ${section}: ${newUrl}`);
 
-      // 🔸 4️⃣ Geri dön, diğer section için devam et
+      // 4️⃣ Geri dön veya reload et
       try {
         await page.goBack({ waitUntil: "domcontentloaded", timeout: 60000 });
         await new Promise(r => setTimeout(r, 1500));
@@ -121,4 +135,9 @@ app.post("/crawl", async (req, res) => {
 
   await browser.close();
   res.json({ results });
+});
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Puppeteer crawler ready on port ${PORT}`);
 });
