@@ -1,13 +1,5 @@
-import express from "express";
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
-
-const app = express();
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true }));
-
 app.post("/crawl", async (req, res) => {
-  const { url, sections } = req.body;
+  const { url, sections, menu_button } = req.body;
 
   if (!url || !url.startsWith("http")) {
     return res.status(400).json({ error: `Invalid URL: ${url}` });
@@ -16,7 +8,6 @@ app.post("/crawl", async (req, res) => {
     return res.status(400).json({ error: "Sections must be a non-empty array" });
   }
 
-  console.log("🌐 Navigating to:", url);
   const browser = await puppeteer.launch({
     args: chromium.args.concat(["--disable-dev-shm-usage", "--no-sandbox"]),
     executablePath: await chromium.executablePath(),
@@ -27,7 +18,6 @@ app.post("/crawl", async (req, res) => {
   await page.setViewport({ width: 1366, height: 768 });
 
   try {
-    // sayfayı yükle (yavaş siteler için 90sn bekleme)
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 90000 });
     await page.waitForSelector("body", { timeout: 60000 });
   } catch (err) {
@@ -37,26 +27,20 @@ app.post("/crawl", async (req, res) => {
   const results = [];
 
   for (const section of sections) {
+    let clicked = false;
+    let newUrl = null;
+
     try {
-      console.log(`🔹 Trying to click section: ${section}`);
+      console.log(`🔹 Trying section: ${section}`);
 
-      // Menü kapalıysa aç (action sheet/drawer menü)
-      await page.evaluate(() => {
-        const toggles = document.querySelectorAll(
-          ".menu-toggle, .mh-menu, button[aria-label*='menu'], .navbar-toggler"
-        );
-        if (toggles.length) toggles[0].click();
-      });
-      await new Promise(r => setTimeout(r, 1500));
-
-      // Menüdeki link veya butonları tara
-      const clicked = await page.evaluate((sectionName) => {
-        const candidates = Array.from(
+      // 🔸 1️⃣ Section tıklamayı dene
+      clicked = await page.evaluate((sectionName) => {
+        const els = Array.from(
           document.querySelectorAll(
-            "a, button, .action-sheet a, .action-sheet button, .menu-drawer a, .menu-drawer button"
+            "a, button, .menu a, .menu button, .action-sheet a, .action-sheet button"
           )
         );
-        const match = candidates.find(el =>
+        const match = els.find(el =>
           el.innerText.trim().toLowerCase().includes(sectionName.trim().toLowerCase())
         );
         if (match) {
@@ -67,17 +51,48 @@ app.post("/crawl", async (req, res) => {
         return false;
       }, section);
 
+      // 🔸 2️⃣ Eğer tıklayamadıysa menu_button varsa onu tıkla ve tekrar dene
+      if (!clicked && menu_button && menu_button.text) {
+        console.log(`⚙️ Couldn't click section, trying menu button "${menu_button.text}"...`);
+        await page.evaluate((btnText) => {
+          const els = Array.from(document.querySelectorAll("a, button, div, span"));
+          const btn = els.find(el =>
+            el.innerText.trim().toLowerCase().includes(btnText.trim().toLowerCase())
+          );
+          if (btn) btn.click();
+        }, menu_button.text);
+        await new Promise(r => setTimeout(r, 2500));
+
+        // menu_button’a bastıktan sonra section’ı tekrar dene
+        clicked = await page.evaluate((sectionName) => {
+          const els = Array.from(
+            document.querySelectorAll(
+              "a, button, .menu a, .menu button, .action-sheet a, .action-sheet button"
+            )
+          );
+          const match = els.find(el =>
+            el.innerText.trim().toLowerCase().includes(sectionName.trim().toLowerCase())
+          );
+          if (match) {
+            match.scrollIntoView({ behavior: "instant", block: "center" });
+            match.click();
+            return true;
+          }
+          return false;
+        }, section);
+      }
+
       if (!clicked) {
-        console.warn(`⚠️ No clickable element found for "${section}"`);
         results.push({ name: section, url: null, error: "No clickable element found" });
         continue;
       }
 
+      // 🔸 3️⃣ URL değişimini takip et
       const prevUrl = page.url();
-      await new Promise(r => setTimeout(r, 3000)); // tıklama sonrası bekleme
-      let newUrl = page.url();
+      await new Promise(r => setTimeout(r, 3000));
+      newUrl = page.url();
 
-      // URL değişmediyse data-id fallback
+      // Fallback: data-id’den URL tahmini
       if (newUrl === prevUrl) {
         const html = await page.content();
         const match = html.match(/data-id="(\d+)"/);
@@ -88,9 +103,9 @@ app.post("/crawl", async (req, res) => {
       }
 
       results.push({ name: section, url: newUrl });
-      console.log(`✅ Found URL for "${section}": ${newUrl}`);
+      console.log(`✅ Found URL for ${section}: ${newUrl}`);
 
-      // Geri dön (bazı menüler modal değilse geri gidebilir)
+      // 🔸 4️⃣ Geri dön, diğer section için devam et
       try {
         await page.goBack({ waitUntil: "domcontentloaded", timeout: 60000 });
         await new Promise(r => setTimeout(r, 1500));
@@ -100,17 +115,10 @@ app.post("/crawl", async (req, res) => {
       }
 
     } catch (err) {
-      console.error(`❌ Error on section "${section}":`, err);
       results.push({ name: section, url: null, error: err.message });
     }
   }
 
   await browser.close();
-  console.log("✅ Done. Results:", results);
   res.json({ results });
-});
-
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Puppeteer crawler ready on port ${PORT}`);
 });
