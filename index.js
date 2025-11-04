@@ -34,11 +34,38 @@ app.post("/crawl", async (req, res) => {
   try {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 90000 });
     await page.waitForSelector("body", { timeout: 60000 });
+
+    // 🔹 Bekle: DOM’da “menü” kelimesi geçene kadar
+    await page.waitForFunction(() => {
+      const texts = Array.from(document.querySelectorAll("*")).map(el => el.textContent.toLowerCase());
+      return texts.some(t => t.includes("menü") || t.includes("menu"));
+    }, { timeout: 20000 }).catch(() => console.log("⚠️ Menü kelimesi DOM'da bulunamadı, devam ediliyor..."));
   } catch (err) {
     console.error("⚠️ Initial navigation failed:", err.message);
   }
 
   const results = [];
+
+  // 🔹 Menü butonunu tıkla (varsa)
+  if (menu_button && menu_button.text) {
+    console.log(`🧭 Clicking menu button: "${menu_button.text}"`);
+    await page.evaluate((btnText) => {
+      const els = Array.from(document.querySelectorAll("a, button, div, span"));
+      const btn = els.find(el =>
+        el.innerText && el.innerText.toLowerCase().includes(btnText.toLowerCase())
+      );
+      if (btn) btn.click();
+    }, menu_button.text);
+    await new Promise(r => setTimeout(r, 3000));
+
+    // Menü açılınca “yiyecek / tatlı / içecek” kelimelerini bekle
+    await page.waitForFunction(() => {
+      const texts = Array.from(document.querySelectorAll("*")).map(el => el.textContent.toLowerCase());
+      return texts.some(t =>
+        t.includes("yiyecek") || t.includes("tatlı") || t.includes("içecek") || t.includes("menu")
+      );
+    }, { timeout: 15000 }).catch(() => console.log("⚠️ Sectionlar görünmedi, yine de devam ediliyor..."));
+  }
 
   for (const section of sections) {
     let clicked = false;
@@ -46,16 +73,13 @@ app.post("/crawl", async (req, res) => {
 
     try {
       console.log(`🔹 Trying section: ${section}`);
+      await new Promise(r => setTimeout(r, 2000)); // kısa bekleme
 
-      // 1️⃣ Section tıklamayı dene
+      // 1️⃣ Section’ı DOM’da arayıp tıkla
       clicked = await page.evaluate((sectionName) => {
-        const els = Array.from(
-          document.querySelectorAll(
-            "a, button, .menu a, .menu button, .action-sheet a, .action-sheet button"
-          )
-        );
+        const els = Array.from(document.querySelectorAll("a, button, div"));
         const match = els.find(el =>
-          el.innerText.trim().toLowerCase().includes(sectionName.trim().toLowerCase())
+          el.innerText && el.innerText.trim().toLowerCase().includes(sectionName.trim().toLowerCase())
         );
         if (match) {
           match.scrollIntoView({ behavior: "instant", block: "center" });
@@ -65,27 +89,22 @@ app.post("/crawl", async (req, res) => {
         return false;
       }, section);
 
-      // 2️⃣ Section tıklanamadıysa menu_button varsa tıkla
+      // 2️⃣ Tıklanamadıysa menü butonuna basıp tekrar dene
       if (!clicked && menu_button && menu_button.text) {
-        console.log(`⚙️ Couldn't click section, trying menu button "${menu_button.text}"...`);
+        console.log(`⚙️ Couldn't click section, retrying after menu button...`);
         await page.evaluate((btnText) => {
           const els = Array.from(document.querySelectorAll("a, button, div, span"));
           const btn = els.find(el =>
-            el.innerText.trim().toLowerCase().includes(btnText.trim().toLowerCase())
+            el.innerText && el.innerText.toLowerCase().includes(btnText.toLowerCase())
           );
           if (btn) btn.click();
         }, menu_button.text);
         await new Promise(r => setTimeout(r, 2500));
 
-        // tekrar dene
         clicked = await page.evaluate((sectionName) => {
-          const els = Array.from(
-            document.querySelectorAll(
-              "a, button, .menu a, .menu button, .action-sheet a, .action-sheet button"
-            )
-          );
+          const els = Array.from(document.querySelectorAll("a, button, div"));
           const match = els.find(el =>
-            el.innerText.trim().toLowerCase().includes(sectionName.trim().toLowerCase())
+            el.innerText && el.innerText.trim().toLowerCase().includes(sectionName.trim().toLowerCase())
           );
           if (match) {
             match.scrollIntoView({ behavior: "instant", block: "center" });
@@ -101,12 +120,12 @@ app.post("/crawl", async (req, res) => {
         continue;
       }
 
-      // 3️⃣ URL değişimini takip et
+      // 3️⃣ URL değişti mi kontrol et
       const prevUrl = page.url();
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 3500));
       newUrl = page.url();
 
-      // Fallback: data-id’den URL tahmini
+      // 4️⃣ Eğer URL aynıysa data-id fallback
       if (newUrl === prevUrl) {
         const html = await page.content();
         const match = html.match(/data-id="(\d+)"/);
@@ -119,7 +138,7 @@ app.post("/crawl", async (req, res) => {
       results.push({ name: section, url: newUrl });
       console.log(`✅ Found URL for ${section}: ${newUrl}`);
 
-      // 4️⃣ Geri dön veya reload et
+      // 5️⃣ Geri dön ya da reload et
       try {
         await page.goBack({ waitUntil: "domcontentloaded", timeout: 60000 });
         await new Promise(r => setTimeout(r, 1500));
@@ -129,6 +148,7 @@ app.post("/crawl", async (req, res) => {
       }
 
     } catch (err) {
+      console.error(`❌ Error on section "${section}": ${err.message}`);
       results.push({ name: section, url: null, error: err.message });
     }
   }
