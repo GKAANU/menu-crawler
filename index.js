@@ -295,7 +295,13 @@ app.post("/crawl", async (req, res) => {
     try {
       // Playwright browser launch
       if (process.env.NODE_ENV === "production") {
+        // Render.com için: chromium'un executable path'ini açıkça belirt
+        // Playwright'ın otomatik olarak chromium-headless-shell kullanmasını önle
+        const chromiumPath = chromium.executablePath();
+        console.log(`🔍 Chromium executable path: ${chromiumPath}`);
+        
         browser = await chromium.launch({
+          executablePath: chromiumPath, // Açıkça chromium path'ini belirt
           headless: true,
           args: [
             '--disable-dev-shm-usage', 
@@ -305,7 +311,8 @@ app.post("/crawl", async (req, res) => {
             '--ignore-certificate-errors',
             '--ignore-ssl-errors',
             '--ignore-certificate-errors-spki-list',
-            '--disable-extensions'
+            '--disable-extensions',
+            '--single-process' // Render.com için daha iyi
           ],
         });
       } else {
