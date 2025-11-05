@@ -300,9 +300,12 @@ app.post("/crawl", async (req, res) => {
           args: [
             '--disable-dev-shm-usage', 
             '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-gpu',
             '--ignore-certificate-errors',
             '--ignore-ssl-errors',
-            '--ignore-certificate-errors-spki-list'
+            '--ignore-certificate-errors-spki-list',
+            '--disable-extensions'
           ],
         });
       } else {
