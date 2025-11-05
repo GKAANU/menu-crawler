@@ -6,7 +6,7 @@ app.use(express.json({ limit: "2mb" }));
 
 // Health check endpoint (Render.com için)
 app.get("/", (req, res) => {
-  res.json({ status: "ok", service: "menu-crawler" });
+  res.json({ status: "ok", service: "playwright-crawler" });
 });
 
 // Section bulma fonksiyonu - Playwright ile (direkt text eşleştirme - encoding sorunu yok)

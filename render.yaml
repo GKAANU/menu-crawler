@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: menu-crawler
+    name: playwright-crawler
     env: node
     buildCommand: npm install && npx playwright install chromium
     startCommand: npm start
