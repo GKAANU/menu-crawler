@@ -1,0 +1,38 @@
+[
+  {
+    "parent_page_url": "https://qr1.tabpadmenu.com/kurucesme-kahvesi-atakoy/",
+    "sections": [
+      {
+        "name": "YİYECEK MENÜSÜ",
+        "selector": null,
+        "url": null
+      },
+      {
+        "name": "TATLI MENÜSÜ",
+        "selector": null,
+        "url": null
+      },
+      {
+        "name": "İÇECEK MENÜSÜ",
+        "selector": null,
+        "url": null
+      },
+      {
+        "name": "NARGİLE MENÜSÜ",
+        "selector": null,
+        "url": null
+      }
+    ],
+    "needs_crawl": true,
+    "menu_button": {
+      "text": "Menüye Git",
+      "selector_hint": "button:contains('Menüye Git')",
+      "url": null
+    },
+    "hints": {
+      "language": "tr",
+      "menu_container_selector": null
+    }
+  }
+]
+
