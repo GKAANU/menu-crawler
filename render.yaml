@@ -2,7 +2,7 @@ services:
   - type: web
     name: menu-crawler
     env: node
-    buildCommand: npm install && npx playwright install chromium
+    buildCommand: npm install && npx playwright install chromium chromium-headless-shell
     startCommand: npm start
     envVars:
       - key: NODE_ENV
