@@ -4,6 +4,11 @@ import { chromium } from "playwright";
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 
+// Health check endpoint (Render.com için)
+app.get("/", (req, res) => {
+  res.json({ status: "ok", service: "menu-crawler" });
+});
+
 // Section bulma fonksiyonu - Playwright ile (direkt text eşleştirme - encoding sorunu yok)
 const findSectionByText = async (page, sectionName) => {
   // sectionName'i gelen data'dan direkt kullan - encoding sorunu olmaması için
@@ -297,24 +302,43 @@ app.post("/crawl", async (req, res) => {
       if (process.env.NODE_ENV === "production") {
         // Render.com için: chromium'un executable path'ini açıkça belirt
         // Playwright'ın otomatik olarak chromium-headless-shell kullanmasını önle
-        const chromiumPath = chromium.executablePath();
-        console.log(`🔍 Chromium executable path: ${chromiumPath}`);
-        
-        browser = await chromium.launch({
-          executablePath: chromiumPath, // Açıkça chromium path'ini belirt
-          headless: true,
-          args: [
-            '--disable-dev-shm-usage', 
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-gpu',
-            '--ignore-certificate-errors',
-            '--ignore-ssl-errors',
-            '--ignore-certificate-errors-spki-list',
-            '--disable-extensions',
-            '--single-process' // Render.com için daha iyi
-          ],
-        });
+        try {
+          const chromiumPath = chromium.executablePath();
+          console.log(`🔍 Chromium executable path: ${chromiumPath}`);
+          
+          browser = await chromium.launch({
+            executablePath: chromiumPath, // Açıkça chromium path'ini belirt
+            headless: true,
+            args: [
+              '--disable-dev-shm-usage', 
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-gpu',
+              '--ignore-certificate-errors',
+              '--ignore-ssl-errors',
+              '--ignore-certificate-errors-spki-list',
+              '--disable-extensions',
+              '--single-process' // Render.com için daha iyi
+            ],
+          });
+        } catch (pathErr) {
+          // executablePath hata verirse, normal launch dene
+          console.log(`⚠️ executablePath failed, using default launch: ${pathErr.message}`);
+          browser = await chromium.launch({
+            headless: true,
+            args: [
+              '--disable-dev-shm-usage', 
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-gpu',
+              '--ignore-certificate-errors',
+              '--ignore-ssl-errors',
+              '--ignore-certificate-errors-spki-list',
+              '--disable-extensions',
+              '--single-process'
+            ],
+          });
+        }
       } else {
         // 🧑‍💻 Lokal ortam - headless: false ile görebilirsiniz
         browser = await chromium.launch({
