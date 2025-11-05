@@ -1,0 +1,19 @@
+{
+  "actorSpecification": 1,
+  "name": "playwright-menu-crawler",
+  "version": "1.0.0",
+  "title": "Playwright Menu Crawler",
+  "description": "Web sayfalarındaki menü bölümlerini otomatik olarak bulup URL'lerini çıkaran Playwright tabanlı crawler",
+  "defaultRunOptions": {
+    "memoryMbytes": 2048,
+    "timeoutSecs": 3600
+  },
+  "buildTag": "latest",
+  "dockerfileFile": "Dockerfile",
+  "storages": {
+    "dataset": "./storage/datasets/default"
+  },
+  "input": "./INPUT_SCHEMA.json",
+  "readme": "./README.md"
+}
+

@@ -1,0 +1,121 @@
+{
+  "title": "Playwright Menu Crawler Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "data": {
+      "title": "Crawl Data",
+      "type": "array",
+      "description": "Crawl edilecek sayfalar ve bölümler listesi",
+      "editor": "json",
+      "default": [],
+      "items": {
+        "type": "object",
+        "properties": {
+          "parent_page_url": {
+            "title": "Parent Page URL",
+            "type": "string",
+            "description": "Ana sayfa URL'i",
+            "editor": "textfield",
+            "example": "https://example.com/menu"
+          },
+          "sections": {
+            "title": "Sections",
+            "type": "array",
+            "description": "Bulunacak menü bölümleri",
+            "editor": "json",
+            "default": [],
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "title": "Section Name",
+                  "type": "string",
+                  "description": "Bölüm adı (ör: 'YİYECEK MENÜSÜ')",
+                  "editor": "textfield"
+                },
+                "selector": {
+                  "title": "Selector",
+                  "type": "string",
+                  "description": "CSS selector (opsiyonel)",
+                  "editor": "textfield",
+                  "nullable": true
+                },
+                "url": {
+                  "title": "URL",
+                  "type": "string",
+                  "description": "Bölüm URL'i (opsiyonel, crawler tarafından doldurulacak)",
+                  "editor": "textfield",
+                  "nullable": true
+                }
+              },
+              "required": ["name"]
+            }
+          },
+          "menu_button": {
+            "title": "Menu Button",
+            "type": "object",
+            "description": "Menü butonu bilgisi (opsiyonel)",
+            "editor": "json",
+            "nullable": true,
+            "properties": {
+              "text": {
+                "title": "Button Text",
+                "type": "string",
+                "description": "Menü butonunun metni",
+                "editor": "textfield"
+              },
+              "selector_hint": {
+                "title": "Selector Hint",
+                "type": "string",
+                "description": "Selector ipucu (opsiyonel)",
+                "editor": "textfield",
+                "nullable": true
+              },
+              "url": {
+                "title": "URL",
+                "type": "string",
+                "description": "Buton URL'i (opsiyonel)",
+                "editor": "textfield",
+                "nullable": true
+              }
+            }
+          },
+          "needs_crawl": {
+            "title": "Needs Crawl",
+            "type": "boolean",
+            "description": "Bu öğe crawl edilmeli mi?",
+            "editor": "checkbox",
+            "default": true
+          },
+          "hints": {
+            "title": "Hints",
+            "type": "object",
+            "description": "Ek ipuçları (opsiyonel)",
+            "editor": "json",
+            "nullable": true,
+            "properties": {
+              "language": {
+                "title": "Language",
+                "type": "string",
+                "description": "Sayfa dili",
+                "editor": "textfield",
+                "nullable": true
+              },
+              "menu_container_selector": {
+                "title": "Menu Container Selector",
+                "type": "string",
+                "description": "Menü container selector'ı",
+                "editor": "textfield",
+                "nullable": true
+              }
+            }
+          }
+        },
+        "required": ["parent_page_url", "sections"]
+      }
+    }
+  },
+  "required": ["data"]
+}
+
