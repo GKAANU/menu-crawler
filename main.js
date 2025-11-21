@@ -245,7 +245,8 @@ const isSocialMediaLink = (href) => {
 
 // HTML'i markdown'a çevir
 // sectionName parametresi opsiyonel - eğer verilirse sadece o section'ın içeriğini extract eder
-const convertPageToMarkdown = async (page, sectionName = null) => {
+// sections parametresi - tüm section isimlerini içeren array (bir sonraki section'ı tespit etmek için)
+const convertPageToMarkdown = async (page, sectionName = null, sections = []) => {
   try {
     const html = await page.content();
     const turndownService = new TurndownService({
@@ -257,7 +258,7 @@ const convertPageToMarkdown = async (page, sectionName = null) => {
     });
     
     // Body içeriğini al (script, style, nav, footer gibi elementleri temizle)
-    const markdown = await page.evaluate(({ sectionName }) => {
+    const markdown = await page.evaluate(({ sectionName, sections }) => {
       // Script ve style taglerini kaldır
       const scripts = document.querySelectorAll('script, style, noscript');
       scripts.forEach(el => el.remove());
@@ -310,16 +311,15 @@ const convertPageToMarkdown = async (page, sectionName = null) => {
           while (current) {
             const currentText = (current.innerText || current.textContent || '').trim();
             
-            // Bir sonraki section başlığı mı kontrol et
-            // Section başlıkları genellikle büyük harflerle yazılır
-            const possibleSections = ['SICAKLAR', 'SALATA', 'MEZELER', 'TATLILAR', 'MEŞRUBAT', 
-                                     'DUBLE KEBAP', 'PİLİÇ VE SAKAT ET', 'FIRIN', 'BEYLERBEYI', 
-                                     'TEKİRDAĞ', 'EFE RAKI', 'YENİ RAKI', 'BIRA', 'VISKI', 'ŞARAPLAR'];
-            const isNextSection = possibleSections.some(sec => 
-              currentText === sec && currentText !== sectionName
-            ) || (currentText.length > 0 && currentText.length < 30 && 
-                  currentText === currentText.toUpperCase() &&
-                  currentText !== sectionName);
+            // Bir sonraki section başlığı mı kontrol et - sadece dinamik sections array'ini kullan
+            // Eğer sections array'i yoksa veya boşsa, hiçbir şey yapma (tüm içeriği al)
+            let isNextSection = false;
+            if (sections && sections.length > 0) {
+              isNextSection = sections.some(sec => {
+                const secName = typeof sec === 'string' ? sec : sec.name;
+                return currentText === secName && currentText !== sectionName;
+              });
+            }
             
             if (isNextSection) {
               break;
@@ -357,11 +357,14 @@ const convertPageToMarkdown = async (page, sectionName = null) => {
                 }
                 
                 if (foundSection) {
-                  // Bir sonraki section başlığı mı kontrol et
-                  const possibleSections = ['SICAKLAR', 'SALATA', 'MEZELER', 'TATLILAR', 'MEŞRUBAT'];
-                  const isNextSection = possibleSections.some(sec => 
-                    childText === sec && childText !== sectionName
-                  );
+                  // Bir sonraki section başlığı mı kontrol et - sadece dinamik sections array'ini kullan
+                  let isNextSection = false;
+                  if (sections && sections.length > 0) {
+                    isNextSection = sections.some(sec => {
+                      const secName = typeof sec === 'string' ? sec : sec.name;
+                      return childText === secName && childText !== sectionName;
+                    });
+                  }
                   
                   if (isNextSection) {
                     break;
@@ -405,7 +408,7 @@ const convertPageToMarkdown = async (page, sectionName = null) => {
       }
       
       return document.body.innerHTML;
-    }, { sectionName });
+    }, { sectionName, sections });
     
     const result = turndownService.turndown(markdown);
     return result;
@@ -938,7 +941,9 @@ const crawlItem = async (item) => {
         // Sayfa içeriğini markdown'a çevir - sadece bu section'ın içeriğini extract et
         console.log(`📝 Converting page content to markdown for section "${sectionName}"...`);
         await page.waitForTimeout(1000); // Sayfanın tam yüklenmesini bekle
-        const markdownContent = await convertPageToMarkdown(page, sectionName);
+        // Tüm section isimlerini array olarak geç (bir sonraki section'ı tespit etmek için)
+        const allSectionNames = validSections.map(s => s.name || s);
+        const markdownContent = await convertPageToMarkdown(page, sectionName, allSectionNames);
         
         if (markdownContent) {
           sectionResults[sectionIndex].markdown_content = markdownContent;
@@ -1079,11 +1084,18 @@ if (!input) {
 }
 
 // Input formatını handle et: hem { data: [...] } hem de direkt array olabilir
+// Ayrıca [{ data: [...] }] formatını da destekle
 let data;
 if (input.data) {
   data = input.data;
 } else if (Array.isArray(input)) {
-  data = input;
+  // Eğer array'in ilk elemanı { data: [...] } formatındaysa
+  if (input.length > 0 && input[0].data && Array.isArray(input[0].data)) {
+    data = input[0].data;
+  } else {
+    // Direkt array formatı
+    data = input;
+  }
 } else {
   // menu_data wrapper'ı olabilir
   data = [input];
