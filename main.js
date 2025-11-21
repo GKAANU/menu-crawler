@@ -294,25 +294,22 @@ const convertPageToMarkdown = async (page, sectionName = null, sections = []) =>
         }
         
         if (sectionElement) {
-          // Section başlığından sonraki içeriği bul
-          // Önce section'ın parent container'ını bul
-          let container = sectionElement.parentElement;
-          let sectionStart = sectionElement;
-          let sectionEnd = null;
-          
-          // Section başlığından sonraki tüm kardeş elementleri kontrol et
-          let current = sectionElement.nextElementSibling;
+          // Section başlığını bulduk, şimdi section içeriğini extract et
+          // Firecrawl gibi: Section başlığından sonraki içeriği bir sonraki section başlığına kadar al
           const sectionContent = [];
           
           // Section başlığını ekle
           sectionContent.push(sectionElement.outerHTML);
           
-          // Section başlığından sonraki içeriği topla (bir sonraki section başlığına kadar)
-          while (current) {
+          // Section başlığından sonraki tüm kardeş elementleri kontrol et
+          let current = sectionElement.nextElementSibling;
+          let elementCount = 0;
+          const maxElements = 200; // Maksimum 200 element (ürünler, fiyatlar, resimler için yeterli)
+          
+          while (current && elementCount < maxElements) {
             const currentText = (current.innerText || current.textContent || '').trim();
             
-            // Bir sonraki section başlığı mı kontrol et - sadece dinamik sections array'ini kullan
-            // Eğer sections array'i yoksa veya boşsa, hiçbir şey yapma (tüm içeriği al)
+            // Bir sonraki section başlığı mı kontrol et - dinamik sections array'ini kullan
             let isNextSection = false;
             if (sections && sections.length > 0) {
               isNextSection = sections.some(sec => {
@@ -322,6 +319,7 @@ const convertPageToMarkdown = async (page, sectionName = null, sections = []) =>
             }
             
             if (isNextSection) {
+              // Bir sonraki section bulundu, dur
               break;
             }
             
@@ -333,52 +331,55 @@ const convertPageToMarkdown = async (page, sectionName = null, sections = []) =>
                 style.visibility !== 'hidden' &&
                 style.opacity !== '0') {
               sectionContent.push(current.outerHTML);
+              elementCount++;
             }
             
             current = current.nextElementSibling;
           }
           
-          // Eğer section içeriği yeterli değilse, parent container'dan al
-          if (sectionContent.length <= 1) {
-            // Section'ın parent'ından başlayarak içeriği topla
+          // Eğer nextElementSibling ile içerik bulunamadıysa, parent container'dan dene
+          if (sectionContent.length <= 1 && sectionElement.parentElement) {
             const parent = sectionElement.parentElement;
-            if (parent) {
-              let foundSection = false;
-              const children = Array.from(parent.children);
+            const children = Array.from(parent.children);
+            let foundSection = false;
+            elementCount = 0;
+            
+            for (const child of children) {
+              if (elementCount >= maxElements) {
+                break;
+              }
               
-              for (const child of children) {
-                const childText = (child.innerText || child.textContent || '').trim();
-                
-                // Section başlığını bulduktan sonra içeriği topla
-                if (childText === sectionName) {
-                  foundSection = true;
-                  sectionContent.push(child.outerHTML);
-                  continue;
+              const childText = (child.innerText || child.textContent || '').trim();
+              
+              // Section başlığını bulduktan sonra içeriği topla
+              if (childText === sectionName) {
+                foundSection = true;
+                continue;
+              }
+              
+              if (foundSection) {
+                // Bir sonraki section başlığı mı kontrol et
+                let isNextSection = false;
+                if (sections && sections.length > 0) {
+                  isNextSection = sections.some(sec => {
+                    const secName = typeof sec === 'string' ? sec : sec.name;
+                    return childText === secName && childText !== sectionName;
+                  });
                 }
                 
-                if (foundSection) {
-                  // Bir sonraki section başlığı mı kontrol et - sadece dinamik sections array'ini kullan
-                  let isNextSection = false;
-                  if (sections && sections.length > 0) {
-                    isNextSection = sections.some(sec => {
-                      const secName = typeof sec === 'string' ? sec : sec.name;
-                      return childText === secName && childText !== sectionName;
-                    });
-                  }
-                  
-                  if (isNextSection) {
-                    break;
-                  }
-                  
-                  // Görünür elementleri ekle
-                  const rect = child.getBoundingClientRect();
-                  const style = window.getComputedStyle(child);
-                  if (rect.width > 0 && rect.height > 0 && 
-                      style.display !== 'none' &&
-                      style.visibility !== 'hidden' &&
-                      style.opacity !== '0') {
-                    sectionContent.push(child.outerHTML);
-                  }
+                if (isNextSection) {
+                  break;
+                }
+                
+                // Görünür elementleri ekle
+                const rect = child.getBoundingClientRect();
+                const style = window.getComputedStyle(child);
+                if (rect.width > 0 && rect.height > 0 && 
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    style.opacity !== '0') {
+                  sectionContent.push(child.outerHTML);
+                  elementCount++;
                 }
               }
             }
@@ -386,25 +387,21 @@ const convertPageToMarkdown = async (page, sectionName = null, sections = []) =>
           
           // Sadece section içeriğini döndür
           if (sectionContent.length > 0) {
-            return sectionContent.join('');
+            const content = sectionContent.join('');
+            // Eğer içerik çok büyükse (500KB'dan fazla), sadece ilk kısmını al
+            // Firecrawl gibi küçük ve temiz içerik için
+            if (content.length > 500000) {
+              console.warn(`⚠️ Section "${sectionName}" content is very large (${content.length} chars), truncating to first 200KB`);
+              // İlk 200KB'ı al (yaklaşık 200,000 karakter) - Firecrawl benzeri boyut
+              return content.substring(0, 200000);
+            }
+            return content;
           }
         }
         
-        // Section bulunamadı veya içerik yok, sadece görünür içeriği döndür (fallback)
-        console.warn(`⚠️ Section "${sectionName}" content not found, returning visible content only`);
-        const visibleElements = [];
-        const allBodyElements = document.querySelectorAll('body > *');
-        for (const el of allBodyElements) {
-          const rect = el.getBoundingClientRect();
-          const style = window.getComputedStyle(el);
-          if (rect.width > 0 && rect.height > 0 && 
-              style.display !== 'none' &&
-              style.visibility !== 'hidden' &&
-              style.opacity !== '0') {
-            visibleElements.push(el.outerHTML);
-          }
-        }
-        return visibleElements.join('');
+        // Section bulunamadı veya içerik yok, boş döndür (fallback olarak tüm sayfayı döndürme)
+        console.warn(`⚠️ Section "${sectionName}" content not found, returning empty content`);
+        return '';
       }
       
       return document.body.innerHTML;
