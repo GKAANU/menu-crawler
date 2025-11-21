@@ -1,5 +1,5 @@
-import { Actor } from 'apify';
 import { chromium } from 'playwright';
+import TurndownService from 'turndown';
 
 // Section bulma fonksiyonu - Playwright ile (direkt text eşleştirme - encoding sorunu yok)
 const findSectionByText = async (page, sectionName) => {
@@ -243,38 +243,433 @@ const isSocialMediaLink = (href) => {
   return socialMediaDomains.some(domain => lowerHref.includes(domain));
 };
 
+// HTML'i markdown'a çevir
+// sectionName parametresi opsiyonel - eğer verilirse sadece o section'ın içeriğini extract eder
+const convertPageToMarkdown = async (page, sectionName = null) => {
+  try {
+    const html = await page.content();
+    const turndownService = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced',
+      bulletListMarker: '-',
+      emDelimiter: '*',
+      strongDelimiter: '**',
+    });
+    
+    // Body içeriğini al (script, style, nav, footer gibi elementleri temizle)
+    const markdown = await page.evaluate(({ sectionName }) => {
+      // Script ve style taglerini kaldır
+      const scripts = document.querySelectorAll('script, style, noscript');
+      scripts.forEach(el => el.remove());
+      
+      // Nav, footer, header gibi navigasyon elementlerini kaldır (opsiyonel)
+      const navElements = document.querySelectorAll('nav, footer, header');
+      navElements.forEach(el => {
+        // Eğer çok küçükse (sadece logo vs) bırak, büyükse kaldır
+        if (el.textContent.trim().length > 100) {
+          el.remove();
+        }
+      });
+      
+      // Eğer sectionName verilmişse, sadece o section'ın içeriğini extract et
+      if (sectionName) {
+        // Section başlığını bul
+        let sectionElement = null;
+        const allElements = document.querySelectorAll('*');
+        
+        for (const el of allElements) {
+          const text = (el.innerText || el.textContent || '').trim();
+          if (text === sectionName) {
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            if (rect.width > 0 && rect.height > 0 && 
+                style.display !== 'none' &&
+                style.visibility !== 'hidden' &&
+                style.opacity !== '0') {
+              sectionElement = el;
+              break;
+            }
+          }
+        }
+        
+        if (sectionElement) {
+          // Section başlığından sonraki içeriği bul
+          // Önce section'ın parent container'ını bul
+          let container = sectionElement.parentElement;
+          let sectionStart = sectionElement;
+          let sectionEnd = null;
+          
+          // Section başlığından sonraki tüm kardeş elementleri kontrol et
+          let current = sectionElement.nextElementSibling;
+          const sectionContent = [];
+          
+          // Section başlığını ekle
+          sectionContent.push(sectionElement.outerHTML);
+          
+          // Section başlığından sonraki içeriği topla (bir sonraki section başlığına kadar)
+          while (current) {
+            const currentText = (current.innerText || current.textContent || '').trim();
+            
+            // Bir sonraki section başlığı mı kontrol et
+            // Section başlıkları genellikle büyük harflerle yazılır
+            const possibleSections = ['SICAKLAR', 'SALATA', 'MEZELER', 'TATLILAR', 'MEŞRUBAT', 
+                                     'DUBLE KEBAP', 'PİLİÇ VE SAKAT ET', 'FIRIN', 'BEYLERBEYI', 
+                                     'TEKİRDAĞ', 'EFE RAKI', 'YENİ RAKI', 'BIRA', 'VISKI', 'ŞARAPLAR'];
+            const isNextSection = possibleSections.some(sec => 
+              currentText === sec && currentText !== sectionName
+            ) || (currentText.length > 0 && currentText.length < 30 && 
+                  currentText === currentText.toUpperCase() &&
+                  currentText !== sectionName);
+            
+            if (isNextSection) {
+              break;
+            }
+            
+            // Görünür elementleri ekle
+            const rect = current.getBoundingClientRect();
+            const style = window.getComputedStyle(current);
+            if (rect.width > 0 && rect.height > 0 && 
+                style.display !== 'none' &&
+                style.visibility !== 'hidden' &&
+                style.opacity !== '0') {
+              sectionContent.push(current.outerHTML);
+            }
+            
+            current = current.nextElementSibling;
+          }
+          
+          // Eğer section içeriği yeterli değilse, parent container'dan al
+          if (sectionContent.length <= 1) {
+            // Section'ın parent'ından başlayarak içeriği topla
+            const parent = sectionElement.parentElement;
+            if (parent) {
+              let foundSection = false;
+              const children = Array.from(parent.children);
+              
+              for (const child of children) {
+                const childText = (child.innerText || child.textContent || '').trim();
+                
+                // Section başlığını bulduktan sonra içeriği topla
+                if (childText === sectionName) {
+                  foundSection = true;
+                  sectionContent.push(child.outerHTML);
+                  continue;
+                }
+                
+                if (foundSection) {
+                  // Bir sonraki section başlığı mı kontrol et
+                  const possibleSections = ['SICAKLAR', 'SALATA', 'MEZELER', 'TATLILAR', 'MEŞRUBAT'];
+                  const isNextSection = possibleSections.some(sec => 
+                    childText === sec && childText !== sectionName
+                  );
+                  
+                  if (isNextSection) {
+                    break;
+                  }
+                  
+                  // Görünür elementleri ekle
+                  const rect = child.getBoundingClientRect();
+                  const style = window.getComputedStyle(child);
+                  if (rect.width > 0 && rect.height > 0 && 
+                      style.display !== 'none' &&
+                      style.visibility !== 'hidden' &&
+                      style.opacity !== '0') {
+                    sectionContent.push(child.outerHTML);
+                  }
+                }
+              }
+            }
+          }
+          
+          // Sadece section içeriğini döndür
+          if (sectionContent.length > 0) {
+            return sectionContent.join('');
+          }
+        }
+        
+        // Section bulunamadı veya içerik yok, sadece görünür içeriği döndür (fallback)
+        console.warn(`⚠️ Section "${sectionName}" content not found, returning visible content only`);
+        const visibleElements = [];
+        const allBodyElements = document.querySelectorAll('body > *');
+        for (const el of allBodyElements) {
+          const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle(el);
+          if (rect.width > 0 && rect.height > 0 && 
+              style.display !== 'none' &&
+              style.visibility !== 'hidden' &&
+              style.opacity !== '0') {
+            visibleElements.push(el.outerHTML);
+          }
+        }
+        return visibleElements.join('');
+      }
+      
+      return document.body.innerHTML;
+    }, { sectionName });
+    
+    const result = turndownService.turndown(markdown);
+    return result;
+  } catch (err) {
+    console.error('⚠️ Error converting page to markdown:', err.message);
+    return null;
+  }
+};
+
 // Crawl işlemi
 const crawlItem = async (item) => {
-  const { parent_page_url, sections, menu_button, needs_crawl } = item;
+  // Debug: Gelen item'ı logla
+  console.log('🔍 crawlItem received item:', JSON.stringify(item, null, 2));
+  
+  // menu_data wrapper'ını handle et - hem { menu_data: {...} } hem de direkt {...} formatını destekle
+  let menuData;
+  if (item.menu_data) {
+    menuData = item.menu_data;
+    console.log('✅ Found menu_data wrapper, using item.menu_data');
+  } else if (item.parent_page_url || item.sections !== undefined) {
+    // Direkt menu_data içeriği gelmiş
+    menuData = item;
+    console.log('✅ Direct menu_data content detected, using item directly');
+  } else {
+    // Fallback: item'ı kullan
+    menuData = item;
+    console.log('⚠️ Using item as fallback');
+  }
+  
+  console.log('📋 Parsed menuData:', JSON.stringify(menuData, null, 2));
+  
+  const { parent_page_url, sections, menu_button, needs_crawl, needs_crawl_reason, type } = menuData;
+  
+  console.log('🔑 Extracted values:', {
+    parent_page_url,
+    sections_length: sections?.length || 0,
+    menu_button: menu_button ? 'present' : 'null/undefined',
+    needs_crawl,
+    needs_crawl_reason,
+    type
+  });
+  
+  // Debug için (production'da kaldırılabilir)
+  if (!menu_button && (needs_crawl_reason === "Navigation page detected" || type === "navigation")) {
+    console.log(`⚠️ Warning: Navigation page detected but menu_button is missing or null`);
+    console.log(`   menuData keys:`, Object.keys(menuData));
+    console.log(`   item keys:`, Object.keys(item));
+  }
 
-  if (!needs_crawl) {
-    // Eğer crawl gerekmiyorsa, mevcut datayı olduğu gibi döndür
+  // Sections kontrolü: sections undefined veya null ise boş array olarak ayarla
+  // Sections boş olabilir, bu normal bir durum
+  const validSections = Array.isArray(sections) ? sections : [];
+
+  // Navigation page durumu: 
+  // 1. type === "navigation" VEYA
+  // 2. needs_crawl_reason === "Navigation page detected" VEYA
+  // 3. sections boş ve menu_button varsa
+  // Bu durumda:
+  //   - Eğer menu_button.url varsa: URL'i aç ve markdown döndür
+  //   - Eğer menu_button.url yoksa ama menu_button.text varsa: Button'a tıkla, sayfayı aç ve markdown döndür
+  // Bu kontrol needs_crawl kontrolünden ÖNCE yapılmalı çünkü navigation page'de needs_crawl false olsa bile işlem yapılmalı
+  const isNavigationPage = type === "navigation" || 
+                           needs_crawl_reason === "Navigation page detected" || 
+                           ((!validSections || validSections.length === 0) && menu_button);
+
+  if (!needs_crawl && !isNavigationPage) {
+    // Eğer crawl gerekmiyorsa ve navigation page değilse, mevcut datayı olduğu gibi döndür
     return {
       parent_page_url,
-      sections: sections.map(s => ({ name: s.name, selector: s.selector, url: s.url })),
+      sections: validSections.map(s => ({ 
+        name: s.name, 
+        selector: s.selector, 
+        url: s.url, 
+        markdown_content: s.markdown_content || null,
+        is_singlepage_app: s.is_singlepage_app || false 
+      })),
       needs_crawl: false,
       menu_button,
+      needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : null),
+      type: type || null,
+      combined_markdown: menuData.combined_markdown || null,
+      is_singlepage_app: false, // needs_crawl false ise, SPA kontrolü yapılmadı
     };
   }
 
   if (!parent_page_url || !parent_page_url.startsWith("http")) {
     return {
       parent_page_url,
-      sections: sections.map(s => ({ name: s.name, selector: null, url: null, error: `Invalid URL: ${parent_page_url}` })),
+      sections: validSections.map(s => ({ name: s.name, selector: null, url: null, error: `Invalid URL: ${parent_page_url}`, is_singlepage_app: false })),
       needs_crawl: true,
       menu_button,
+      needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : null),
+      type: type || null,
+      combined_markdown: menuData.combined_markdown || null,
       error: `Invalid URL: ${parent_page_url}`,
+      is_singlepage_app: false,
     };
   }
 
-  if (!Array.isArray(sections) || sections.length === 0) {
+  // type === "navigation" olduğunda, menu_button null ise hata döndür
+  if (isNavigationPage && !menu_button) {
     return {
       parent_page_url,
       sections: [],
       needs_crawl: true,
-      menu_button,
-      error: "Sections must be a non-empty array",
+      menu_button: null,
+      needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : null),
+      type: type || null,
+      combined_markdown: menuData.combined_markdown || null,
+      error: "Navigation page detected but menu_button is required. Please provide menu_button.url or menu_button.text",
+      is_singlepage_app: false,
     };
+  }
+  
+  if (isNavigationPage && menu_button) {
+    let browser;
+    try {
+      browser = await chromium.launch({
+        headless: true,
+        args: [
+          '--disable-dev-shm-usage', 
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-gpu',
+          '--ignore-certificate-errors',
+          '--ignore-ssl-errors',
+          '--ignore-certificate-errors-spki-list',
+          '--disable-extensions',
+        ],
+      });
+
+      const context = await browser.newContext({
+        viewport: { width: 375, height: 667 },
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+        ignoreHTTPSErrors: true,
+      });
+      
+      const page = await context.newPage();
+      
+      try {
+        // Önce parent_page_url'e git
+        console.log(`🌐 Navigating to parent page: ${parent_page_url}`);
+        await page.goto(parent_page_url, { waitUntil: "domcontentloaded", timeout: 90000 });
+        await page.waitForLoadState("domcontentloaded");
+        await page.waitForTimeout(2000);
+        
+        // Senaryo 1: menu_button.url varsa direkt URL'i aç
+        if (menu_button.url) {
+          console.log(`🧭 Navigation page detected, opening menu_button.url: ${menu_button.url}`);
+          await page.goto(menu_button.url, { waitUntil: "domcontentloaded", timeout: 90000 });
+          await page.waitForLoadState("domcontentloaded");
+          await page.waitForTimeout(2000);
+        } 
+        // Senaryo 2: menu_button.url yoksa ama menu_button.text varsa button'a tıkla
+        else if (menu_button.text) {
+          console.log(`🧭 Navigation page detected, clicking menu button with text: "${menu_button.text}"`);
+          
+          // Menu button'u bul ve tıkla
+          const menuButtonElement = await findMenuButton(page, menu_button.text);
+          
+          if (menuButtonElement) {
+            console.log(`✅ Menu button found, clicking...`);
+            await menuButtonElement.scrollIntoViewIfNeeded();
+            await page.waitForTimeout(300);
+            await menuButtonElement.click({ timeout: 5000 });
+            console.log(`✅ Menu button clicked successfully`);
+            
+            // URL değişimini bekle
+            await page.waitForTimeout(2000);
+            
+            // URL değişti mi kontrol et
+            const currentUrl = page.url();
+            if (currentUrl !== parent_page_url && currentUrl !== 'about:blank') {
+              console.log(`✅ URL changed after button click: ${currentUrl}`);
+            } else {
+              console.log(`⚠️ URL didn't change after button click, staying on: ${currentUrl}`);
+            }
+          } else {
+            await browser.close();
+            console.error(`❌ Menu button not found with text: "${menu_button.text}"`);
+            return {
+              parent_page_url,
+              sections: [],
+              needs_crawl: false,
+              menu_button,
+              needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : "Navigation page detected"),
+              type: type || null,
+              error: `Menu button not found with text: "${menu_button.text}"`,
+              is_singlepage_app: false,
+            };
+          }
+        } else {
+          await browser.close();
+          console.error(`❌ Navigation page detected but neither menu_button.url nor menu_button.text provided`);
+          return {
+            parent_page_url,
+            sections: [],
+            needs_crawl: false,
+            menu_button,
+            needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : "Navigation page detected"),
+            type: type || null,
+            error: "Navigation page detected but neither menu_button.url nor menu_button.text provided",
+            is_singlepage_app: false,
+          };
+        }
+        
+        // Sayfanın tam yüklenmesini bekle
+        await page.waitForLoadState("domcontentloaded");
+        await page.waitForTimeout(2000);
+        
+        // Markdown içeriğini oluştur
+        const markdownContent = await convertPageToMarkdown(page);
+        await browser.close();
+        
+        if (markdownContent) {
+          return {
+            parent_page_url,
+            sections: [],
+            needs_crawl: false,
+            menu_button,
+            needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : "Navigation page detected"),
+            type: type || null,
+            combined_markdown: markdownContent,
+            is_singlepage_app: false,
+          };
+        } else {
+          return {
+            parent_page_url,
+            sections: [],
+            needs_crawl: false,
+            menu_button,
+            needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : "Navigation page detected"),
+            type: type || null,
+            error: "Failed to generate markdown content",
+            is_singlepage_app: false,
+          };
+        }
+      } catch (err) {
+        await browser.close();
+        console.error(`⚠️ Error processing navigation page: ${err.message}`);
+        return {
+          parent_page_url,
+          sections: [],
+          needs_crawl: false,
+          menu_button,
+          needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : "Navigation page detected"),
+          type: type || null,
+          error: err.message,
+          is_singlepage_app: false,
+        };
+      }
+    } catch (err) {
+      console.error("🚨 Browser launch failed:", err.message);
+      return {
+        parent_page_url,
+        sections: [],
+        needs_crawl: false,
+        menu_button,
+        needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : "Navigation page detected"),
+        type: type || null,
+        error: err.message,
+        is_singlepage_app: false,
+      };
+    }
   }
 
   let browser;
@@ -297,10 +692,14 @@ const crawlItem = async (item) => {
     console.error("🚨 Browser launch failed:", err.message);
     return {
       parent_page_url,
-      sections: sections.map(s => ({ name: s.name, selector: null, url: null, error: err.message })),
+      sections: validSections.map(s => ({ name: s.name, selector: null, url: null, error: err.message, is_singlepage_app: false })),
       needs_crawl: true,
       menu_button,
+      needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : null),
+      type: type || null,
+      combined_markdown: menuData.combined_markdown || null,
       error: err.message,
+      is_singlepage_app: false,
     };
   }
 
@@ -331,15 +730,15 @@ const crawlItem = async (item) => {
   }
 
   // Section results'ı orijinal section objelerini kopyalayarak başlat
-  const sectionResults = sections.map(s => ({ ...s }));
+  const sectionResults = validSections.map(s => ({ ...s }));
 
-  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-    const section = sections[sectionIndex];
+  for (let sectionIndex = 0; sectionIndex < validSections.length; sectionIndex++) {
+    const section = validSections[sectionIndex];
     const sectionName = section.name || section;
     let clicked = false;
 
     try {
-      console.log(`\n🔹 [${sectionIndex + 1}/${sections.length}] Trying section: ${sectionName}`);
+      console.log(`\n🔹 [${sectionIndex + 1}/${validSections.length}] Trying section: ${sectionName}`);
       
       // Sayfanın yüklenmesini bekle
       await page.waitForLoadState("domcontentloaded");
@@ -347,6 +746,10 @@ const crawlItem = async (item) => {
       await page.waitForTimeout(2000);
       
       console.log(`📍 Current URL before section search: ${page.url()}`);
+      
+      // prevUrl'i tıklamadan ÖNCE al (URL değişikliğini doğru tespit etmek için)
+      let prevUrl = page.url();
+      console.log(`📍 URL before clicking section "${sectionName}": ${prevUrl}`);
 
       // 1️⃣ İlk önce section'ı direkt bulmayı dene
       try {
@@ -428,6 +831,10 @@ const crawlItem = async (item) => {
               }
               
               // Menu açıldıktan sonra section'ı bul ve tıkla
+              // prevUrl'i menu açıldıktan sonra ama section'a tıklamadan ÖNCE al
+              const prevUrlAfterMenu = page.url();
+              console.log(`📍 URL before clicking section "${sectionName}" (after menu open): ${prevUrlAfterMenu}`);
+              
               try {
                 console.log(`🔍 Searching for section: "${sectionName}" (original text from data)`);
                 const sectionElement = await findSectionByText(page, sectionName);
@@ -443,6 +850,8 @@ const crawlItem = async (item) => {
                       clicked = true;
                       console.log(`✅ Section "${sectionName}" clicked successfully after menu open`);
                       await page.waitForTimeout(2000);
+                      // prevUrl'i güncelle (menu açıldıktan sonraki URL'yi kullan)
+                      prevUrl = prevUrlAfterMenu;
                     } catch (err) {
                       console.log(`⚠️ Click failed after menu open for "${sectionName}":`, err.message);
                       try {
@@ -450,6 +859,8 @@ const crawlItem = async (item) => {
                         clicked = true;
                         await page.waitForTimeout(2000);
                         console.log(`✅ Section "${sectionName}" clicked via evaluate fallback`);
+                        // prevUrl'i güncelle (menu açıldıktan sonraki URL'yi kullan)
+                        prevUrl = prevUrlAfterMenu;
                       } catch (evalErr) {
                         console.log(`⚠️ Evaluate click also failed:`, evalErr.message);
                       }
@@ -478,13 +889,14 @@ const crawlItem = async (item) => {
       if (!clicked) {
         sectionResults[sectionIndex].url = null;
         sectionResults[sectionIndex].error = "No clickable element found";
+        sectionResults[sectionIndex].is_singlepage_app = false;
         console.log(`❌ Section "${sectionName}" could not be clicked`);
         continue;
       }
 
       // 5️⃣ URL değişimini kontrol et
-      const prevUrl = page.url();
-      console.log(`📍 Current URL before navigation for "${sectionName}": ${prevUrl}`);
+      // prevUrl zaten tıklamadan önce alındı, sadece logla
+      console.log(`📍 Current URL after clicking "${sectionName}": ${page.url()}`);
       
       let urlChanged = false;
       for (let i = 0; i < 15; i++) {
@@ -503,6 +915,12 @@ const crawlItem = async (item) => {
             (url) => url.toString() !== prevUrl && url.toString() !== parent_page_url && url.toString() !== 'about:blank',
             { timeout: 5000, waitUntil: "domcontentloaded" }
           ).catch(() => {});
+          // waitForURL sonrasında URL değişmiş olabilir, tekrar kontrol et
+          const currentUrlAfterWait = page.url();
+          if (currentUrlAfterWait !== prevUrl && currentUrlAfterWait !== parent_page_url && currentUrlAfterWait !== 'about:blank') {
+            urlChanged = true;
+            console.log(`✅ URL changed after waitForURL for "${sectionName}": ${currentUrlAfterWait}`);
+          }
         } catch (err) {
           console.log(`⚠️ URL wait timeout for "${sectionName}":`, err.message);
         }
@@ -511,16 +929,46 @@ const crawlItem = async (item) => {
       const browserUrl = page.url();
       console.log(`📍 Browser URL bar for "${sectionName}": ${browserUrl}`);
       
-      if (browserUrl && browserUrl !== parent_page_url && browserUrl !== 'about:blank' && browserUrl.startsWith('http')) {
-        sectionResults[sectionIndex].url = browserUrl;
-        console.log(`✅ URL saved for "${sectionName}": ${browserUrl}`);
+      // URL'nin gerçekten değişip değişmediğini kontrol et (prevUrl ile direkt karşılaştır)
+      // urlChanged flag'ine güvenme, çünkü waitForURL timeout olabilir ama URL değişmiş olabilir
+      const actualUrlChanged = browserUrl !== prevUrl && browserUrl !== parent_page_url && browserUrl !== 'about:blank';
+      
+      // YENİ DAVRANIŞ: Her zaman markdown döndür (URL yerine)
+      if (clicked) {
+        // Sayfa içeriğini markdown'a çevir - sadece bu section'ın içeriğini extract et
+        console.log(`📝 Converting page content to markdown for section "${sectionName}"...`);
+        await page.waitForTimeout(1000); // Sayfanın tam yüklenmesini bekle
+        const markdownContent = await convertPageToMarkdown(page, sectionName);
+        
+        if (markdownContent) {
+          sectionResults[sectionIndex].markdown_content = markdownContent;
+          console.log(`✅ Markdown content generated for section "${sectionName}" (${markdownContent.length} characters)`);
+        } else {
+          console.log(`⚠️ Failed to generate markdown content for section "${sectionName}"`);
+        }
+        
+        // URL bilgisini de sakla (opsiyonel, ama markdown öncelikli)
+        if (actualUrlChanged && browserUrl && browserUrl.startsWith('http')) {
+          sectionResults[sectionIndex].url = browserUrl;
+          sectionResults[sectionIndex].is_singlepage_app = false;
+          console.log(`✅ URL saved for "${sectionName}": ${browserUrl}`);
+        } else if (!actualUrlChanged && (browserUrl === prevUrl || browserUrl === parent_page_url)) {
+          sectionResults[sectionIndex].is_singlepage_app = true;
+          sectionResults[sectionIndex].url = null;
+          console.log(`✅ Section "${sectionName}" clicked successfully but URL didn't change - this is a Single Page App`);
+        } else {
+          sectionResults[sectionIndex].url = null;
+          sectionResults[sectionIndex].is_singlepage_app = false;
+          console.log(`⚠️ URL not saved for "${sectionName}" (prevUrl: ${prevUrl}, browserUrl: ${browserUrl})`);
+        }
       } else {
         sectionResults[sectionIndex].url = null;
-        console.log(`⚠️ Invalid URL for "${sectionName}", not saving`);
+        sectionResults[sectionIndex].is_singlepage_app = false;
+        console.log(`⚠️ Section "${sectionName}" was not clicked, no markdown generated`);
       }
 
       // 6️⃣ Ana sayfaya geri dön (son section değilse)
-      if (sectionIndex < sections.length - 1) {
+      if (sectionIndex < validSections.length - 1) {
         const currentUrlAfterSave = page.url();
         console.log(`📍 Current URL after saving URL: ${currentUrlAfterSave}`);
         
@@ -559,28 +1007,99 @@ const crawlItem = async (item) => {
       console.error(`❌ Error on section ${sectionName}:`, err.message);
       sectionResults[sectionIndex].url = null;
       sectionResults[sectionIndex].error = err.message;
+      sectionResults[sectionIndex].is_singlepage_app = false;
     }
   }
 
   await browser.close();
+
+  // Genel SPA kontrolü: Eğer en az bir section başarıyla tıklandı ama hiçbirinde URL değişmediyse, bu bir SPA'dır
+  const clickedSections = sectionResults.filter(s => !s.error);
+  const sectionsWithUrlChange = sectionResults.filter(s => s.url && s.url !== parent_page_url);
+  const isSinglePageApp = clickedSections.length > 0 && sectionsWithUrlChange.length === 0;
 
   return {
     parent_page_url,
     sections: sectionResults,
     needs_crawl: false,
     menu_button,
+    needs_crawl_reason: needs_crawl_reason || (type === "navigation" ? "Navigation page detected" : null),
+    type: type || null,
+    combined_markdown: menuData.combined_markdown || null,
+    is_singlepage_app: isSinglePageApp,
+    single_url_app: isSinglePageApp, // SPA durumu için
   };
 };
 
 // Apify Actor Main
+// Test modu kontrolü
+const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test');
+
+let Actor;
+if (isTestMode) {
+  // Test modu için mock Actor
+  const fs = await import('fs');
+  Actor = {
+    async init() {
+      console.log('🎭 Mock Apify Actor initialized (Test Mode)');
+    },
+    async getInput() {
+      const inputData = JSON.parse(fs.readFileSync('test-input.json', 'utf-8'));
+      // Eğer input wrapper'ı varsa, içindeki data'yı döndür
+      return inputData.input || inputData;
+    },
+    async pushData(data) {
+      console.log('📤 Mock pushData:', JSON.stringify(data, null, 2));
+      // Markdown içeriğini de göster
+      if (data.sections) {
+        data.sections.forEach((section, index) => {
+          if (section.markdown_content) {
+            console.log(`\n📝 Section "${section.name}" Markdown Content (first 500 chars):`);
+            console.log(section.markdown_content.substring(0, 500) + '...\n');
+          }
+        });
+      }
+    },
+    async exit() {
+      console.log('👋 Mock Apify Actor exited');
+    }
+  };
+} else {
+  Actor = (await import('apify')).Actor;
+}
+
 await Actor.init();
 
 const input = await Actor.getInput();
-const { data } = input;
+console.log('📥 Received input:', JSON.stringify(input, null, 2));
 
-if (!Array.isArray(data) || data.length === 0) {
-  throw new Error('Input must contain a non-empty "data" array');
+// Input validation
+if (!input) {
+  throw new Error('Input is missing or undefined');
 }
+
+// Input formatını handle et: hem { data: [...] } hem de direkt array olabilir
+let data;
+if (input.data) {
+  data = input.data;
+} else if (Array.isArray(input)) {
+  data = input;
+} else {
+  // menu_data wrapper'ı olabilir
+  data = [input];
+}
+
+if (!Array.isArray(data)) {
+  console.error('❌ Data is not an array. Type:', typeof data, 'Value:', data);
+  throw new Error(`Input "data" must be an array, got ${typeof data} instead. Value: ${JSON.stringify(data)}`);
+}
+
+if (data.length === 0) {
+  console.error('❌ Data array is empty');
+  throw new Error('Input "data" array is empty. Please provide at least one item.');
+}
+
+console.log(`✅ Input validated. Found ${data.length} item(s) to process.`);
 
 const results = [];
 
