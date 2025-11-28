@@ -1,0 +1,42 @@
+[
+  {
+    "data": [
+      {
+        "type": "menu",
+        "parent_page_url": "https://elizinn.com.tr/tr/kategori/menu/?gad_campaignid=20930807497",
+        "sections": [
+          {
+            "name": "Pasta",
+            "selector": null,
+            "url": "https://elizinn.com.tr/tr/kategori/pasta/"
+          },
+          {
+            "name": "Tatlı & Tuzlu",
+            "selector": null,
+            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/"
+          },
+          {
+            "name": "Çikolata",
+            "selector": null,
+            "url": "https://elizinn.com.tr/tr/kategori/cikolata/"
+          },
+          {
+            "name": "Yemek",
+            "selector": null,
+            "url": "https://elizinn.com.tr/tr/kategori/menu/"
+          },
+          {
+            "name": "Mezeler",
+            "selector": null,
+            "url": "https://elizinn.com.tr/tr/kategori/mezeler/"
+          }
+        ],
+        "needs_crawl": false,
+        "needs_crawl_reason": "URLs already exist",
+        "menu_button": null,
+        "hints": {},
+        "combined_markdown": null
+      }
+    ]
+  }
+]
