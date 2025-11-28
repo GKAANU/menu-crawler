@@ -950,13 +950,8 @@ const crawlItem = async (item) => {
                            needs_crawl_reason === "Navigation page detected" || 
                            ((!validSections || validSections.length === 0) && menu_button);
 
-  // YENİ DAVRANIŞ: Section URL'leri olsa bile markdown çıkarılmalı
-  // Eğer needs_crawl false ise ama section URL'leri varsa, direkt o URL'lere gidip markdown çıkar
-  // Sadece navigation page değilse ve hiçbir section URL'i yoksa, mevcut datayı döndür
-  const hasSectionUrls = validSections.some(s => s.url && s.url.startsWith('http'));
-  
-  if (!needs_crawl && !isNavigationPage && !hasSectionUrls) {
-    // Eğer crawl gerekmiyorsa, navigation page değilse ve section URL'leri yoksa, mevcut datayı olduğu gibi döndür
+  if (!needs_crawl && !isNavigationPage) {
+    // Eğer crawl gerekmiyorsa ve navigation page değilse, mevcut datayı olduğu gibi döndür
     return {
       parent_page_url,
       sections: validSections.map(s => ({ 
@@ -1219,50 +1214,10 @@ const crawlItem = async (item) => {
   for (let sectionIndex = 0; sectionIndex < validSections.length; sectionIndex++) {
     const section = validSections[sectionIndex];
     const sectionName = section.name || section;
-    const sectionUrl = section.url;
     let clicked = false;
 
     try {
       console.log(`\n🔹 [${sectionIndex + 1}/${validSections.length}] Trying section: ${sectionName}`);
-      
-      // YENİ DAVRANIŞ: Eğer section URL'i varsa, direkt o URL'e git ve markdown çıkar
-      if (sectionUrl && sectionUrl.startsWith('http')) {
-        console.log(`🌐 Section "${sectionName}" has URL, navigating directly: ${sectionUrl}`);
-        try {
-          await page.goto(sectionUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
-          await page.waitForLoadState("domcontentloaded");
-          await page.waitForTimeout(2000);
-          await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-          await page.waitForTimeout(2000);
-          
-          // Tüm section isimlerini array olarak geç
-          const allSectionNames = validSections.map(s => s.name || s);
-          // Pagination desteği ile tüm sayfaların markdown'ını al ve birleştir
-          const markdownContent = await crawlAllPaginationPages(page, sectionName, allSectionNames);
-          
-          if (markdownContent && markdownContent.trim().length > 0) {
-            sectionResults[sectionIndex].markdown_content = markdownContent;
-            sectionResults[sectionIndex].url = sectionUrl;
-            sectionResults[sectionIndex].is_singlepage_app = false;
-            console.log(`✅ Markdown content extracted for "${sectionName}" from direct URL (${markdownContent.length} characters)`);
-            
-            // Ana sayfaya geri dön (son section değilse)
-            if (sectionIndex < validSections.length - 1) {
-              console.log(`🔙 Navigating back to parent page: ${parent_page_url}`);
-              await page.goto(parent_page_url, { waitUntil: "domcontentloaded", timeout: 60000 });
-              await page.waitForLoadState("domcontentloaded");
-              await page.waitForTimeout(2000);
-            }
-            continue; // Bu section tamamlandı, bir sonrakine geç
-          } else {
-            console.log(`⚠️ Failed to extract markdown from direct URL, trying fallback method...`);
-            // Fallback: Normal section bulma yöntemini dene
-          }
-        } catch (urlErr) {
-          console.log(`⚠️ Error navigating to section URL: ${urlErr.message}, trying fallback method...`);
-          // Fallback: Normal section bulma yöntemini dene
-        }
-      }
       
       // Sayfanın yüklenmesini bekle
       await page.waitForLoadState("domcontentloaded");
@@ -1667,7 +1622,13 @@ if (isTestMode) {
       console.log('🎭 Mock Apify Actor initialized (Test Mode)');
     },
     async getInput() {
-      const inputData = JSON.parse(fs.readFileSync('test-input.json', 'utf-8'));
+      // Önce test-input-short.json'ı dene, yoksa test-input.json'ı kullan
+      let inputData;
+      try {
+        inputData = JSON.parse(fs.readFileSync('test-input-short.json', 'utf-8'));
+      } catch (e) {
+        inputData = JSON.parse(fs.readFileSync('test-input.json', 'utf-8'));
+      }
       // Eğer input wrapper'ı varsa, içindeki data'yı döndür
       return inputData.input || inputData;
     },
