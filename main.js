@@ -814,6 +814,61 @@ const convertPageToMarkdown = async (page, sectionName = null, sections = []) =>
             }
           }
           
+          // Eğer hâlâ içerik yoksa, section başlığından sonraki tüm görünür içeriği al (SPA için)
+          if (sectionContent.length <= 1) {
+            // Section başlığını bulduktan sonra, sayfadaki tüm görünür içeriği al
+            // Ama sadece section başlığından sonraki içeriği
+            const allVisibleElements = document.querySelectorAll('*');
+            let foundSection = false;
+            
+            for (const el of allVisibleElements) {
+              if (elementCount >= maxElements) break;
+              
+              const text = (el.innerText || el.textContent || '').trim();
+              const rect = el.getBoundingClientRect();
+              const style = window.getComputedStyle(el);
+              
+              // Section başlığını bul
+              if (text === sectionName && !foundSection) {
+                const elRect = el.getBoundingClientRect();
+                const elStyle = window.getComputedStyle(el);
+                if (elRect.width > 0 && elRect.height > 0 && 
+                    elStyle.display !== 'none' &&
+                    elStyle.visibility !== 'hidden') {
+                  foundSection = true;
+                  continue;
+                }
+              }
+              
+              // Section başlığından sonraki içeriği al
+              if (foundSection) {
+                // Bir sonraki section başlığı mı kontrol et
+                let isNextSection = false;
+                if (sections && sections.length > 0) {
+                  isNextSection = sections.some(sec => {
+                    const secName = typeof sec === 'string' ? sec : sec.name;
+                    return text === secName && text !== sectionName;
+                  });
+                }
+                
+                if (isNextSection) {
+                  break;
+                }
+                
+                // Görünür ve içerik içeren elementleri ekle
+                if (rect.width > 0 && rect.height > 0 && 
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    style.opacity !== '0' &&
+                    text.length > 0 && // Boş değil
+                    text !== sectionName) { // Section başlığı değil
+                  sectionContent.push(el.outerHTML);
+                  elementCount++;
+                }
+              }
+            }
+          }
+          
           // Eğer hâlâ içerik yoksa, section'ın parent container'ının tüm içeriğini al
           if (sectionContent.length <= 1 && sectionElement.parentElement) {
             const parentContainer = sectionElement.parentElement;
@@ -879,7 +934,23 @@ const convertPageToMarkdown = async (page, sectionName = null, sections = []) =>
         
         // Section bulunamadı veya içerik yok, fallback olarak tüm sayfayı döndür (sectionName ile filtrele)
         console.warn(`⚠️ Section "${sectionName}" content not found, trying to extract from full page...`);
-        // Tüm sayfayı döndür ama sectionName'i içeren bölümü önceliklendir
+        // SPA için: Section'a tıklandıktan sonra tüm görünür içeriği al
+        // Section başlığını içeren container'ı bul ve tüm içeriğini al
+        const allContainers = document.querySelectorAll('div, section, article, main, [class*="container"], [class*="content"], [class*="menu"], [class*="item"]');
+        for (const container of allContainers) {
+          const containerText = (container.innerText || container.textContent || '').trim();
+          if (containerText.includes(sectionName)) {
+            const rect = container.getBoundingClientRect();
+            const style = window.getComputedStyle(container);
+            if (rect.width > 0 && rect.height > 0 && 
+                style.display !== 'none' &&
+                style.visibility !== 'hidden' &&
+                containerText.length > sectionName.length * 2) { // İçerik var (sadece başlık değil)
+              return container.innerHTML;
+            }
+          }
+        }
+        // Son fallback: Tüm sayfayı döndür
         return document.body.innerHTML;
       }
       
@@ -1255,7 +1326,15 @@ const crawlItem = async (item) => {
               await page.waitForTimeout(300);
               await sectionElement.click({ timeout: 5000 });
               clicked = true;
-              await page.waitForTimeout(1500); // İçeriğin yüklenmesi için daha uzun bekle
+              // SPA için daha uzun bekleme - içeriğin dinamik olarak yüklenmesi için
+              await page.waitForTimeout(3000); // 3 saniye bekle
+              // Network idle olana kadar bekle
+              try {
+                await page.waitForLoadState("networkidle", { timeout: 10000 });
+              } catch (e) {
+                console.log(`⚠️ Network idle timeout, continuing anyway...`);
+              }
+              await page.waitForTimeout(2000); // Ekstra 2 saniye bekle
               console.log(`✅ Section "${sectionName}" clicked successfully`);
             } catch (err) {
               console.log(`⚠️ Click failed for "${sectionName}":`, err.message);
@@ -1457,17 +1536,95 @@ const crawlItem = async (item) => {
         // Section tıklandıktan sonra içeriğin yüklenmesi için bekle
         // Önce DOM'un güncellenmesini bekle
         await page.waitForLoadState("domcontentloaded");
-        await page.waitForTimeout(2000); // 2 saniye bekle
+        await page.waitForTimeout(3000); // 3 saniye bekle
         
-        // Network idle olana kadar bekle (maksimum 10 saniye)
+        // Network idle olana kadar bekle (maksimum 15 saniye - SPA için daha uzun)
         try {
-          await page.waitForLoadState("networkidle", { timeout: 10000 });
+          await page.waitForLoadState("networkidle", { timeout: 15000 });
         } catch (e) {
           console.log(`⚠️ Network idle timeout, continuing anyway...`);
         }
         
-        // Ekstra bekleme - dinamik içerik için
-        await page.waitForTimeout(2000);
+        // Ekstra bekleme - dinamik içerik için (SPA'lar için daha uzun)
+        await page.waitForTimeout(3000);
+        
+        // Section içeriğinin gerçekten yüklendiğini kontrol et - içerik var mı?
+        let hasContent = false;
+        for (let i = 0; i < 10; i++) {
+          hasContent = await page.evaluate(({ sectionName }) => {
+            // Section başlığını bul
+            const allElements = document.querySelectorAll('*');
+            let sectionElement = null;
+            for (const el of allElements) {
+              const text = (el.innerText || el.textContent || '').trim();
+              if (text === sectionName) {
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                if (rect.width > 0 && rect.height > 0 && 
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden') {
+                  sectionElement = el;
+                  break;
+                }
+              }
+            }
+            
+            if (!sectionElement) return false;
+            
+            // Section başlığından sonra içerik var mı kontrol et
+            // Parent container'ı kontrol et
+            let parent = sectionElement.parentElement;
+            if (parent) {
+              const children = Array.from(parent.children);
+              let foundSection = false;
+              for (const child of children) {
+                const childText = (child.innerText || child.textContent || '').trim();
+                if (childText === sectionName) {
+                  foundSection = true;
+                  continue;
+                }
+                if (foundSection) {
+                  // İçerik var mı? (sadece başlık değil, gerçek içerik)
+                  const rect = child.getBoundingClientRect();
+                  const style = window.getComputedStyle(child);
+                  if (rect.width > 0 && rect.height > 0 && 
+                      style.display !== 'none' &&
+                      style.visibility !== 'hidden' &&
+                      childText.length > sectionName.length) {
+                    return true; // İçerik bulundu
+                  }
+                }
+              }
+            }
+            
+            // nextElementSibling kontrolü
+            let current = sectionElement.nextElementSibling;
+            while (current) {
+              const currentText = (current.innerText || current.textContent || '').trim();
+              const rect = current.getBoundingClientRect();
+              const style = window.getComputedStyle(current);
+              if (rect.width > 0 && rect.height > 0 && 
+                  style.display !== 'none' &&
+                  style.visibility !== 'hidden' &&
+                  currentText.length > sectionName.length) {
+                return true; // İçerik bulundu
+              }
+              current = current.nextElementSibling;
+            }
+            
+            return false;
+          }, { sectionName });
+          
+          if (hasContent) {
+            console.log(`✅ Section "${sectionName}" content appears to be loaded with actual content`);
+            break;
+          }
+          await page.waitForTimeout(1000);
+        }
+        
+        if (!hasContent) {
+          console.log(`⚠️ Section "${sectionName}" content might not be fully loaded, but proceeding with extraction...`);
+        }
         
         // İçeriğin gerçekten yüklendiğini kontrol et - section başlığının görünür olması
         let contentLoaded = false;
@@ -1503,8 +1660,26 @@ const crawlItem = async (item) => {
         
         // Tüm section isimlerini array olarak geç (bir sonraki section'ı tespit etmek için)
         const allSectionNames = validSections.map(s => s.name || s);
-        // Pagination desteği ile tüm sayfaların markdown'ını al ve birleştir
-        const markdownContent = await crawlAllPaginationPages(page, sectionName, allSectionNames);
+        
+        // SPA için: Section'a tıklandıktan sonra, sectionName parametresi olmadan tüm sayfayı extract et
+        // Çünkü SPA'larda section içeriği dinamik olarak yükleniyor ve section başlığından sonraki içerik bulunamıyor olabilir
+        let markdownContent;
+        if (actualUrlChanged) {
+          // URL değiştiyse normal section extraction
+          markdownContent = await crawlAllPaginationPages(page, sectionName, allSectionNames);
+        } else {
+          // SPA durumunda: Tüm sayfayı extract et (sectionName olmadan)
+          console.log(`📝 SPA detected for "${sectionName}", extracting full page content...`);
+          markdownContent = await convertPageToMarkdown(page, null, allSectionNames);
+          // Eğer içerik çok kısa ise (sadece başlık gibi), sectionName ile tekrar dene
+          if (markdownContent && markdownContent.trim().length < 100) {
+            console.log(`⚠️ Full page content too short, trying with section name...`);
+            const sectionMarkdown = await convertPageToMarkdown(page, sectionName, allSectionNames);
+            if (sectionMarkdown && sectionMarkdown.trim().length > markdownContent.trim().length) {
+              markdownContent = sectionMarkdown;
+            }
+          }
+        }
         
         if (markdownContent && markdownContent.trim().length > 0) {
           sectionResults[sectionIndex].markdown_content = markdownContent;

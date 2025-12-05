@@ -3,313 +3,88 @@
     "data": [
       {
         "type": "menu",
-        "parent_page_url": "https://elizinn.com.tr/tr/kategori/menu/",
+        "parent_page_url": "https://mobrespos.com/mpqra/?id=MP206",
         "sections": [
           {
-            "name": "Pasta",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/pasta/"
+            "name": "SICAKLAR",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Pasta > Yaş Pastalar",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/pasta/yas-pastalar/"
+            "name": "DUBLE KEBAP",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Pasta > Adet Pastalar",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/pasta/adet-pastalar/"
+            "name": "PİLİÇ VE SAKAT ET",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Pasta > Petifür",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/pasta/petifurler/"
+            "name": "FIRIN",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Pasta > Cheesecake",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/pasta/cheesecake/"
+            "name": "SALATA",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Pasta > Turtalar",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/pasta/turta/"
+            "name": "MEZELER",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Pasta > Cupcake",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/pasta/cupcake/"
+            "name": "TATLILAR",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Tatlı & Tuzlu",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/"
+            "name": "MEŞRUBAT",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Tatlı & Tuzlu > Tatlı Tezgahı",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tatli-tezgahi/"
+            "name": "BEYLERBEYI",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Tatlı & Tuzlu > Tatlı Tezgahı > Bisküvi",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tatli-tezgahi/biskuvi/"
+            "name": "TEKİRDAĞ",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Tatlı & Tuzlu > Tatlı Tezgahı > Kurabiyeler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tatli-tezgahi/kurabiye/"
+            "name": "EFE RAKI",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Tatlı & Tuzlu > Tatlı Tezgahı > Spesiyal Kurabiyeler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tatli-tezgahi/spesiyal-kurabiyeler/"
+            "name": "YENİ RAKI",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Tatlı & Tuzlu > Tatlı Tezgahı > Kek",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tatli-tezgahi/kek-corek/"
+            "name": "BIRA VISKI",
+            "selector": "",
+            "url": ""
           },
           {
-            "name": "Tatlı & Tuzlu > Sütlü Tatlılar",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/sutlu-tatlilar/"
-          },
-          {
-            "name": "Tatlı & Tuzlu > Baklava",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/serbetli-tatlilar/"
-          },
-          {
-            "name": "Tatlı & Tuzlu > Tuzlu Tezgahı",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tuzlu-tezgahi/"
-          },
-          {
-            "name": "Tatlı & Tuzlu > Tuzlu Tezgahı > Tuzlu Kurabiyeler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tuzlu-tezgahi/tuzlu-kurabiyeler/"
-          },
-          {
-            "name": "Tatlı & Tuzlu > Tuzlu Tezgahı > Börek",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tuzlu-tezgahi/borek/"
-          },
-          {
-            "name": "Tatlı & Tuzlu > Tuzlu Tezgahı > Simit",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tuzlu-tezgahi/simit-gevrek/"
-          },
-          {
-            "name": "Tatlı & Tuzlu > Tuzlu Tezgahı > Poğaça",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tuzlu-tezgahi/pogaca/"
-          },
-          {
-            "name": "Tatlı & Tuzlu > Tuzlu Tezgahı > Açma",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tuzlu-tezgahi/pogaca-acma/"
-          },
-          {
-            "name": "Tatlı & Tuzlu > Sandviç",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/sandvic/"
-          },
-          {
-            "name": "Tatlı & Tuzlu > Atıştırmalık Paket",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/tatli-tuzlu/tatli-tuzlu-paket/"
-          },
-          {
-            "name": "Çikolata",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/cikolata/"
-          },
-          {
-            "name": "Çikolata > Madlen Çikolatalar",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/cikolata/madlen-cikolata/"
-          },
-          {
-            "name": "Çikolata > Spesiyal Çikolatalar",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/cikolata/kutu-cikolatalar/"
-          },
-          {
-            "name": "Çikolata > Drajeler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/cikolata/drajeler/"
-          },
-          {
-            "name": "Çikolata > Lokumlar",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/cikolata/lokumlar/"
-          },
-          {
-            "name": "Macaron",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/macaron/"
-          },
-          {
-            "name": "Yemek",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/"
-          },
-          {
-            "name": "Yemek > Online Özel",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/online-ozel/"
-          },
-          {
-            "name": "Yemek > Kahvaltı",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/kahvalti/"
-          },
-          {
-            "name": "Yemek > Kahvaltı > Kahvaltı Tabağı",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/kahvalti/kahvalti-tabagi/"
-          },
-          {
-            "name": "Yemek > Kahvaltı > Omletler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/omletler/"
-          },
-          {
-            "name": "Yemek > Kahvaltı > Tost",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/tostlar/"
-          },
-          {
-            "name": "Yemek > Sandviç",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/sandvicler/"
-          },
-          {
-            "name": "Yemek > Hamburger",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/burger/"
-          },
-          {
-            "name": "Yemek > Krep",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/krep/"
-          },
-          {
-            "name": "Yemek > Dürüm",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/durum/"
-          },
-          {
-            "name": "Yemek > Ana Yemekler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/ana-yemekler/"
-          },
-          {
-            "name": "Yemek > Ana Yemekler > Et Yemekleri",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/ana-yemekler/etli-menuler/"
-          },
-          {
-            "name": "Yemek > Ana Yemekler > Tavuk Yemekleri",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/ana-yemekler/tavuklu-menuler/"
-          },
-          {
-            "name": "Yemek > Bowl",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/kasede-lezzetler/"
-          },
-          {
-            "name": "Yemek > Taco",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/ozel-takolar/"
-          },
-          {
-            "name": "Yemek > Salata",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/salatalar/"
-          },
-          {
-            "name": "Yemek > Makarna",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/makarnalar/"
-          },
-          {
-            "name": "Yemek > Pizza",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/pizzalar/"
-          },
-          {
-            "name": "Yemek > Çorba",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/corba/"
-          },
-          {
-            "name": "Yemek > Aperatifler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/baslangiclar/"
-          },
-          {
-            "name": "Yemek > Ek Lezzetler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/yan-lezzetler/"
-          },
-          {
-            "name": "Yemek > Fit Yemekler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/light-menu/"
-          },
-          {
-            "name": "Yemek > Waffle & Pankek",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/waffle-ve-spesiyal-tatlilar/"
-          },
-          {
-            "name": "Yemek > İçecekler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/menu/icecekler/"
-          },
-          {
-            "name": "Mezeler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/mezeler/"
-          },
-          {
-            "name": "Mezeler > Zeytinyağlılar",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/mezeler/zeytinyaglilar/"
-          },
-          {
-            "name": "Mezeler > Yoğurtlu Meze",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/mezeler/yogurtlumeze/"
-          },
-          {
-            "name": "Mezeler > Dolma",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/mezeler/dolma/"
-          },
-          {
-            "name": "Mezeler > Sıcak Mezeler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/mezeler/sicakmezeler/"
-          },
-          {
-            "name": "Mezeler > Soğuk Mezeler",
-            "selector": null,
-            "url": "https://elizinn.com.tr/tr/kategori/mezeler/sogukmezeler/"
+            "name": "ŞARAPLAR",
+            "selector": "",
+            "url": ""
           }
         ],
-        "needs_crawl": false,
-        "needs_crawl_reason": "URLs already exist",
+        "needs_crawl": true,
+        "needs_crawl_reason": "Sections exist but none have URLs, crawling required",
         "menu_button": {
-          "text": null,
-          "selector_hint": null,
-          "url": null
+          "text": "",
+          "selector_hint": "",
+          "url": ""
         },
         "hints": {},
-        "combined_markdown": null
+        "combined_markdown": ""
       }
     ]
   }
