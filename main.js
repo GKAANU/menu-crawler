@@ -624,6 +624,75 @@ const crawlAllPaginationPages = async (page, sectionName, allSectionNames) => {
   }
 };
 
+// Markdown'dan section'ları çıkar
+// fullMarkdown: Tüm markdown içeriği
+// sectionNames: Çıkarılacak section isimlerinin array'i
+// Returns: { sectionName: markdownContent } formatında obje
+const extractSectionsFromMarkdown = (fullMarkdown, sectionNames) => {
+  if (!fullMarkdown || !sectionNames || sectionNames.length === 0) {
+    return {};
+  }
+  
+  const result = {};
+  const lines = fullMarkdown.split('\n');
+  
+  // Her section için içeriği çıkar
+  for (let i = 0; i < sectionNames.length; i++) {
+    const sectionName = sectionNames[i];
+    const nextSectionName = i < sectionNames.length - 1 ? sectionNames[i + 1] : null;
+    
+    let sectionStartIndex = -1;
+    let sectionEndIndex = lines.length;
+    
+    // Section başlığını bul (exact match veya contains match)
+    for (let j = 0; j < lines.length; j++) {
+      const line = lines[j].trim();
+      
+      // Section başlığını bul (exact match veya contains match - ama çok kısa değilse)
+      if (line === sectionName || (line.includes(sectionName) && sectionName.length > 3)) {
+        // Eğer bu satırdan önceki satırlar boşsa veya başlık formatındaysa, bu section başlığı olabilir
+        // Ama sadece section başlığı değil, içerik de olmalı
+        // Bir sonraki satırlara bak, içerik var mı?
+        let hasContent = false;
+        for (let k = j + 1; k < Math.min(j + 5, lines.length); k++) {
+          const nextLine = lines[k].trim();
+          if (nextLine && nextLine !== sectionName && nextLine.length > 0) {
+            hasContent = true;
+            break;
+          }
+        }
+        
+        if (hasContent && sectionStartIndex === -1) {
+          sectionStartIndex = j;
+        }
+      }
+      
+      // Bir sonraki section başlığını bul (section sonu)
+      if (nextSectionName && sectionStartIndex !== -1) {
+        const line = lines[j].trim();
+        if (line === nextSectionName || (line.includes(nextSectionName) && nextSectionName.length > 3)) {
+          // Bir önceki section'ın sonu
+          sectionEndIndex = j;
+          break;
+        }
+      }
+    }
+    
+    // Section içeriğini çıkar
+    if (sectionStartIndex !== -1) {
+      const sectionLines = lines.slice(sectionStartIndex, sectionEndIndex);
+      const sectionContent = sectionLines.join('\n').trim();
+      
+      // Eğer içerik sadece section başlığından ibaret değilse ekle
+      if (sectionContent && sectionContent.length > sectionName.length + 10) {
+        result[sectionName] = sectionContent;
+      }
+    }
+  }
+  
+  return result;
+};
+
 // HTML'i markdown'a çevir
 // sectionName parametresi opsiyonel - eğer verilirse sadece o section'ın içeriğini extract eder
 // sections parametresi - tüm section isimlerini içeren array (bir sonraki section'ı tespit etmek için)
@@ -643,6 +712,16 @@ const convertPageToMarkdown = async (page, sectionName = null, sections = []) =>
       // Script ve style taglerini kaldır
       const scripts = document.querySelectorAll('script, style, noscript');
       scripts.forEach(el => el.remove());
+      
+      // Base64 ile başlayan görselleri (img taglerini) kaldır - markdown'ı şişiriyorlar
+      const images = document.querySelectorAll('img');
+      images.forEach(img => {
+        const src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+        // Eğer src data:image ile başlıyorsa (base64), img tagini kaldır
+        if (src.startsWith('data:image/')) {
+          img.remove();
+        }
+      });
       
       // Nav, footer, header gibi navigasyon elementlerini kaldır (opsiyonel)
       const navElements = document.querySelectorAll('nav, footer, header');
@@ -1797,19 +1876,14 @@ if (isTestMode) {
       console.log('🎭 Mock Apify Actor initialized (Test Mode)');
     },
     async getInput() {
-      // Önce test-input-short.json'ı dene, yoksa test-input.json'ı kullan
-      let inputData;
-      try {
-        inputData = JSON.parse(fs.readFileSync('test-input-short.json', 'utf-8'));
-      } catch (e) {
-        inputData = JSON.parse(fs.readFileSync('test-input.json', 'utf-8'));
-      }
+      // Test modunda test-input.json dosyasını kullan
+      const inputData = JSON.parse(fs.readFileSync('test-input.json', 'utf-8'));
       // Eğer input wrapper'ı varsa, içindeki data'yı döndür
       return inputData.input || inputData;
     },
     async pushData(data) {
       console.log('📤 Mock pushData:', JSON.stringify(data, null, 2));
-      // Markdown içeriğini tam olarak göster
+      // Markdown içeriğini tam olarak göster (sadece test modunda console'a)
       if (data.sections) {
         data.sections.forEach((section, index) => {
           if (section.markdown_content) {
